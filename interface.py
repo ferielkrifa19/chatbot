@@ -35,15 +35,149 @@ MODELES = [
 api_key = os.getenv("GROQ_API_KEY")
 
 if not api_key:
-    st.error(
-        "La clé GROQ_API_KEY est absente du fichier .env."
-    )
+    st.error("La clé GROQ_API_KEY est absente du fichier .env.")
     st.stop()
 
 client = OpenAI(
     api_key=api_key,
     base_url="https://api.groq.com/openai/v1",
 )
+
+
+# ==================================================
+# DESIGN DE L'INTERFACE
+# ==================================================
+
+st.markdown("""
+<style>
+    /* Fond général */
+    .stApp {
+        background-color: #F7F8FC;
+    }
+
+    /* Contenu principal */
+    .block-container {
+        max-width: 1150px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+
+    /* Barre latérale */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(
+            180deg,
+            #EEF2FF 0%,
+            #F8FAFC 100%
+        );
+        border-right: 1px solid #E0E7FF;
+    }
+
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {
+        color: #312E81;
+    }
+
+    /* Boutons */
+    .stButton > button {
+        border-radius: 10px;
+        border: 1px solid #D8DEEF;
+        transition: all 0.2s ease;
+    }
+
+    .stButton > button:hover {
+        border-color: #6366F1;
+        color: #4338CA;
+        background-color: #EEF2FF;
+    }
+
+    /* Champs de saisie */
+    .stTextInput input,
+    .stTextArea textarea,
+    [data-testid="stChatInput"] textarea {
+        border-radius: 12px;
+    }
+
+    /* Cartes d'accueil */
+    .hero-card {
+        background: linear-gradient(
+            120deg,
+            #4338CA 0%,
+            #6366F1 55%,
+            #818CF8 100%
+        );
+        padding: 30px;
+        border-radius: 22px;
+        color: white;
+        margin: 8px 0 24px 0;
+        box-shadow: 0 8px 24px rgba(67, 56, 202, 0.15);
+    }
+
+    .hero-card h1 {
+        color: white;
+        font-size: 32px;
+        margin: 0 0 12px 0;
+    }
+
+    .hero-card p {
+        color: #EEF2FF;
+        font-size: 16px;
+        margin: 0;
+        line-height: 1.7;
+    }
+
+    .hero-label {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 20px;
+        padding: 5px 12px;
+        font-size: 12px;
+        margin-bottom: 14px;
+    }
+
+    /* Petites cartes de fonctionnalités */
+    .feature-card {
+        background: white;
+        border: 1px solid #E5E7EB;
+        border-radius: 15px;
+        padding: 17px;
+        min-height: 125px;
+    }
+
+    .feature-card h4 {
+        color: #3730A3;
+        font-size: 16px;
+        margin: 8px 0;
+    }
+
+    .feature-card p {
+        color: #64748B;
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 0;
+    }
+
+    /* Séparateurs */
+    hr {
+        border-color: #E5E7EB;
+    }
+
+    /* Messages */
+    [data-testid="stChatMessage"] {
+        border-radius: 14px;
+        padding: 12px;
+    }
+
+    /* Indication discrète */
+    .footer-note {
+        color: #94A3B8;
+        text-align: center;
+        font-size: 12px;
+        padding-top: 25px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 
 # ==================================================
@@ -70,14 +204,12 @@ def requete(sql, params=(), fetch=False):
 
 
 def initialiser_db():
-    """Crée les tables nécessaires et adapte le schéma existant."""
-
+    """Crée les tables et adapte le schéma existant."""
     conn = sqlite3.connect(DB)
 
     try:
         cur = conn.cursor()
 
-        # Création si la table n'existe pas encore.
         cur.execute("""
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,11 +219,9 @@ def initialiser_db():
             )
         """)
 
-        # Migration automatique de l'ancienne table.
+        # Adaptation automatique de l'ancienne table.
         cur.execute("PRAGMA table_info(conversations)")
-        colonnes = [
-            colonne[1] for colonne in cur.fetchall()
-        ]
+        colonnes = [colonne[1] for colonne in cur.fetchall()]
 
         if "user_id" not in colonnes:
             cur.execute("""
@@ -122,7 +252,6 @@ initialiser_db()
 # AUTHENTIFICATION
 # ==================================================
 
-# Cette fonction provient de ton fichier auth.py.
 utilisateur = auth.afficher_auth()
 
 if utilisateur is None:
@@ -227,7 +356,6 @@ def supprimer_conversation(conv_id, user_id):
 
 def transcrire(audio):
     """Convertit un enregistrement vocal en texte français."""
-
     resultat = client.audio.transcriptions.create(
         file=(
             audio.name or "voix.wav",
@@ -264,23 +392,26 @@ if "img_key" not in st.session_state:
 # ==================================================
 
 with st.sidebar:
-    st.title("🤖 Mon Chatbot")
+    st.markdown("## 🤖 Mon Chatbot IA")
+    st.caption("Votre espace intelligent")
 
-    st.write("Connecté avec :")
-    st.write(utilisateur["email"])
+    st.write("👤 **Connecté avec :**")
+    st.caption(utilisateur["email"])
 
-    if st.button("Déconnexion", use_container_width=True):
+    if st.button("🚪 Déconnexion", use_container_width=True):
         auth.deconnecter()
         st.rerun()
 
     st.divider()
 
-    if st.button("➕ Nouvelle conversation",
-                 use_container_width=True):
+    if st.button(
+        "➕ Nouvelle conversation",
+        use_container_width=True,
+    ):
         st.session_state.conv_id = None
         st.rerun()
 
-    st.subheader("Paramètres du modèle")
+    st.markdown("### ⚙️ Paramètres du modèle")
 
     modele = st.selectbox(
         "Modèle IA",
@@ -312,11 +443,8 @@ with st.sidebar:
 
     st.divider()
 
-    # ----------------------------------------------
     # DOCUMENTS RAG
-    # ----------------------------------------------
-
-    st.subheader("📚 Documents (RAG)")
+    st.markdown("### 📚 Documents (RAG)")
 
     utiliser_rag = st.checkbox(
         "Utiliser mes documents",
@@ -324,14 +452,15 @@ with st.sidebar:
     )
 
     fichiers = st.file_uploader(
-        "Importer un PDF ou un fichier TXT",
+        "Importer des fichiers PDF ou TXT",
         type=["pdf", "txt"],
         accept_multiple_files=True,
     )
 
-    if st.button("Indexer les documents",
-                 use_container_width=True):
-
+    if st.button(
+        "📥 Indexer les documents",
+        use_container_width=True,
+    ):
         if not fichiers:
             st.warning("Choisis au moins un fichier.")
 
@@ -353,9 +482,7 @@ with st.sidebar:
                         temp.write(fichier.getvalue())
                         chemin_temporaire = temp.name
 
-                    # Signature connue de ton module rag.py.
                     rag.ajouter_document(chemin_temporaire)
-
                     succes += 1
 
                 except Exception as erreur:
@@ -377,17 +504,15 @@ with st.sidebar:
 
     try:
         st.caption(
-            f"Nombre de morceaux indexés : "
-            f"{rag.nombre_morceaux()}"
+            f"🧩 Morceaux indexés : {rag.nombre_morceaux()}"
         )
     except Exception:
-        st.caption(
-            "Le nombre de morceaux n'est pas disponible."
-        )
+        st.caption("Nombre de morceaux non disponible.")
 
-    if st.button("Effacer les documents indexés",
-                 use_container_width=True):
-
+    if st.button(
+        "🗑️ Effacer les documents indexés",
+        use_container_width=True,
+    ):
         try:
             rag.supprimer_documents()
             st.success("Documents indexés supprimés.")
@@ -396,11 +521,8 @@ with st.sidebar:
 
     st.divider()
 
-    # ----------------------------------------------
     # IMAGE
-    # ----------------------------------------------
-
-    st.subheader("🖼️ Image")
+    st.markdown("### 🖼️ Image")
 
     image_fichier = st.file_uploader(
         "Joindre une image à votre question",
@@ -410,11 +532,8 @@ with st.sidebar:
 
     st.divider()
 
-    # ----------------------------------------------
     # HISTORIQUE
-    # ----------------------------------------------
-
-    st.subheader("Historique")
+    st.markdown("### 🕘 Historique")
 
     conversations = lister_conversations(USER_ID)
 
@@ -428,7 +547,7 @@ with st.sidebar:
 
         with col1:
             if st.button(
-                titre[:35],
+                f"💬 {titre[:30]}",
                 key=f"ouvrir_{conv_id}",
                 use_container_width=True,
             ):
@@ -440,10 +559,7 @@ with st.sidebar:
                 "🗑️",
                 key=f"supprimer_{conv_id}",
             ):
-                supprimer_conversation(
-                    conv_id,
-                    USER_ID,
-                )
+                supprimer_conversation(conv_id, USER_ID)
 
                 if st.session_state.conv_id == conv_id:
                     st.session_state.conv_id = None
@@ -452,10 +568,20 @@ with st.sidebar:
 
 
 # ==================================================
-# AFFICHAGE DE LA CONVERSATION
+# ACCUEIL ET CONVERSATION
 # ==================================================
 
-st.title("Chatbot IA")
+st.markdown("""
+<div class="hero-card">
+    <div class="hero-label">✦ VOTRE ASSISTANT INTELLIGENT</div>
+    <h1>🤖 Mon Chatbot IA</h1>
+    <p>
+        Bonjour ! Posez vos questions, discutez avec l'IA,
+        explorez vos documents ou envoyez une image.
+        Votre espace de conversation vous attend.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 conv_id = st.session_state.conv_id
 
@@ -470,15 +596,49 @@ if conv_id is not None:
         with st.chat_message(role):
             st.markdown(contenu)
 
+else:
+    st.markdown("### ✨ Que souhaitez-vous faire ?")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("""
+        <div class="feature-card">
+            <div style="font-size:26px;">💬</div>
+            <h4>Poser une question</h4>
+            <p>Discutez avec votre assistant IA et obtenez des réponses claires.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("""
+        <div class="feature-card">
+            <div style="font-size:26px;">📚</div>
+            <h4>Analyser des documents</h4>
+            <p>Importez des PDF ou des fichiers TXT pour rechercher des informations.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown("""
+        <div class="feature-card">
+            <div style="font-size:26px;">🖼️</div>
+            <h4>Comprendre une image</h4>
+            <p>Joignez une image à votre question pour demander une analyse.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.write("")
+
 
 # ==================================================
 # ENTREE VOCALE ET TEXTUELLE
 # ==================================================
 
-st.subheader("🎙️ Poser une question à voix haute")
+st.markdown("### 🎙️ Parler ou écrire")
 
 audio = st.audio_input(
-    "Parle, puis arrête l'enregistrement",
+    "Enregistre ta question ici",
     key=f"audio_{st.session_state.audio_key}",
 )
 
@@ -493,21 +653,17 @@ if question_texte and question_texte.strip():
     question = question_texte.strip()
 
 elif audio is not None:
-    with st.spinner("Transcription de l'enregistrement..."):
+    with st.spinner("🎧 Transcription de l'enregistrement..."):
         try:
             question = transcrire(audio)
 
             if question:
                 st.info(f"Question transcrite : {question}")
             else:
-                st.warning(
-                    "Aucune parole n'a été détectée."
-                )
+                st.warning("Aucune parole n'a été détectée.")
 
         except Exception as erreur:
-            st.error(
-                f"Impossible de transcrire l'audio : {erreur}"
-            )
+            st.error(f"Impossible de transcrire l'audio : {erreur}")
 
 
 # ==================================================
@@ -521,15 +677,9 @@ if question:
 
     if conv_id is None:
         titre = question[:50]
-
-        conv_id = creer_conversation(
-            titre,
-            USER_ID,
-        )
-
+        conv_id = creer_conversation(titre, USER_ID)
         st.session_state.conv_id = conv_id
 
-    # Vérification supplémentaire d'accès.
     if not conversation_autorisee(conv_id, USER_ID):
         st.error("Accès à cette conversation refusé.")
         st.stop()
@@ -542,9 +692,6 @@ if question:
             resultats = rag.chercher(question, n=3)
 
             if resultats:
-                # Prend en charge des résultats textuels
-                # ainsi que des documents renvoyés sous forme
-                # de dictionnaires.
                 textes = []
 
                 for element in resultats:
@@ -591,11 +738,8 @@ if question:
         }
     ]
 
-    # Charger l'historique de cette conversation.
-    historique = charger_messages(
-        conv_id,
-        USER_ID,
-    )
+    # Charger l'historique.
+    historique = charger_messages(conv_id, USER_ID)
 
     for role, contenu in historique:
         messages.append({
@@ -603,18 +747,17 @@ if question:
             "content": contenu,
         })
 
-    # Ajouter l'image si l'utilisateur en a fourni une.
+    # Préparer le message avec ou sans image.
     contenu_question = question
 
     if image_fichier is not None:
         image_bytes = image_fichier.getvalue()
+
         image_base64 = base64.b64encode(
             image_bytes
         ).decode("utf-8")
 
-        type_image = (
-            image_fichier.type or "image/png"
-        )
+        type_image = image_fichier.type or "image/png"
 
         contenu_question = [
             {
@@ -640,7 +783,7 @@ if question:
         question,
     )
 
-    # Afficher la question dans l'interface.
+    # Afficher la question.
     with st.chat_message("user"):
         st.markdown(question)
 
@@ -656,10 +799,9 @@ if question:
         "content": contenu_question,
     })
 
-    # Générer la réponse du modèle.
+    # Générer la réponse.
     with st.chat_message("assistant"):
-        with st.spinner("Le chatbot réfléchit..."):
-
+        with st.spinner("✨ Votre assistant prépare une réponse..."):
             try:
                 reponse = client.chat.completions.create(
                     model=modele,
@@ -687,7 +829,7 @@ if question:
 
                 if contexte_rag:
                     with st.expander(
-                        "Voir le contexte documentaire utilisé"
+                        "📚 Voir le contexte documentaire utilisé"
                     ):
                         st.write(contexte_rag)
 
@@ -701,3 +843,14 @@ if question:
     st.session_state.img_key += 1
 
     st.rerun()
+
+
+# ==================================================
+# PIED DE PAGE
+# ==================================================
+
+st.markdown("""
+<div class="footer-note">
+    Mon Chatbot IA · Propulsé par l'intelligence artificielle
+</div>
+""", unsafe_allow_html=True)
